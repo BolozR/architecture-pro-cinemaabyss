@@ -10,22 +10,49 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.eventsService.replicas }}
-  selector:
-    matchLabels:
-      app: events-service
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1
       maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: events-service
   template:
     metadata:
       labels:
         app: events-service
     spec:
+      imagePullSecrets:
+        - name: dockerconfigjson
       containers:
-      - name: events-service
-       .... тут
+        - name: events-service
+          image: {{ .Values.eventsService.image.repository }}:{{ .Values.eventsService.image.tag }}
+          imagePullPolicy: {{ .Values.eventsService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.eventsService.service.targetPort }}
+          env:
+            - name: PORT
+              value: {{ .Values.eventsService.service.targetPort | quote }}
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: cinemaabyss-config
+                  key: KAFKA_BROKERS
+          readinessProbe:
+            httpGet:
+              path: /api/events/health
+              port: {{ .Values.eventsService.service.targetPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/events/health
+              port: {{ .Values.eventsService.service.targetPort }}
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.eventsService.resources | nindent 12 }}
 ---
 apiVersion: v1
 kind: Service
@@ -37,5 +64,11 @@ metadata:
     app.kubernetes.io/name: {{ include "cinemaabyss.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
- ........ и тут
+  type: {{ .Values.eventsService.service.type }}
+  selector:
+    app: events-service
+  ports:
+    - name: http
+      port: {{ .Values.eventsService.service.port }}
+      targetPort: {{ .Values.eventsService.service.targetPort }}
 {{- end }}

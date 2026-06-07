@@ -33,11 +33,11 @@ spec:
         app: events-service
     spec:
       imagePullSecrets:
-        - name: ghcr-secret
+        - name: dockerconfigjson
       containers:
         - name: events-service
           image: ghcr.io/bolozr/architecture-pro-cinemaabyss/events-service:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8082
           env:
