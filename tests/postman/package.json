@@ -2,6 +2,7 @@
   "name": "cinemaabyss-api-tests",
   "version": "1.0.0",
   "description": "API tests for CinemaAbyss microservices architecture",
+  "type": "module",
   "main": "run-tests.js",
   "scripts": {
     "test": "node run-tests.js",
@@ -19,7 +20,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "newman": "^5.3.2",
-    "yargs": "^17.6.2"
-  }
+    "newman": "^6.2.2",
+    "newman-reporter-htmlextra": "^1.23.1",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {}
 }
