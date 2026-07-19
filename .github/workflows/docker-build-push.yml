@@ -16,7 +16,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: ${{ github.repository }}
+  IMAGE_NAMESPACE: bolozr/architecture-pro-cinemaabyss
 
 jobs:
   build-test-and-push:
