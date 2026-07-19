@@ -23,8 +23,10 @@ spec:
       labels:
         app: events-service
     spec:
+      {{- with .Values.imagePullSecrets.existingSecret }}
       imagePullSecrets:
-        - name: dockerconfigjson
+        - name: {{ . | quote }}
+      {{- end }}
       containers:
         - name: events-service
           image: {{ .Values.eventsService.image.repository }}:{{ .Values.eventsService.image.tag }}
@@ -47,7 +49,7 @@ spec:
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /api/events/health
+              path: /health
               port: {{ .Values.eventsService.service.targetPort }}
             initialDelaySeconds: 15
             periodSeconds: 15

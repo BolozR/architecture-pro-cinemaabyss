@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import queue
 import socket
 import threading
 import time
@@ -21,9 +20,6 @@ TOPICS = {
     "payment": "payment-events",
 }
 
-memory_queue: "queue.Queue[Tuple[str, Dict[str, Any]]]" = queue.Queue()
-offset_lock = threading.Lock()
-offset = 0
 producer = None
 producer_lock = threading.Lock()
 
@@ -32,7 +28,7 @@ try:
 except Exception as exc:  # pragma: no cover
     KafkaProducer = None  # type: ignore
     KafkaConsumer = None  # type: ignore
-    log.warning("kafka-python is not available, using in-memory fallback: %s", exc)
+    log.error("kafka-python is not available; event publishing is disabled: %s", exc)
 
 
 def now_iso() -> str:
@@ -52,6 +48,7 @@ def get_producer():
                 value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"),
                 key_serializer=lambda v: v.encode("utf-8") if isinstance(v, str) else v,
                 retries=3,
+                acks="all",
                 linger_ms=10,
                 request_timeout_ms=2000,
                 api_version_auto_timeout_ms=1000,
@@ -63,33 +60,43 @@ def get_producer():
         return producer
 
 
-def publish(topic: str, event: Dict[str, Any]) -> Tuple[int, int]:
-    global offset
-    partition = 0
-    with offset_lock:
-        offset += 1
-        local_offset = offset
+def reset_producer():
+    global producer
+    with producer_lock:
+        if producer is not None:
+            try:
+                producer.close(timeout=1)
+            except Exception:
+                pass
+        producer = None
 
-    prod = get_producer()
-    if prod is not None:
+
+def publish(topic: str, event: Dict[str, Any]) -> Tuple[int, int]:
+    """Publish an event only after Kafka acknowledges it.
+
+    Returning success for an in-memory fallback made the API look healthy while
+    the event was absent from Kafka. A temporary broker outage is now surfaced
+    to the caller so it can retry without silently losing the event.
+    """
+    last_error = None
+    for attempt in range(1, 6):
+        prod = get_producer()
+        if prod is None:
+            last_error = RuntimeError("Kafka producer is not ready")
+            time.sleep(attempt)
+            continue
         try:
             meta = prod.send(topic, key=event["id"], value=event).get(timeout=10)
             prod.flush(timeout=5)
-            partition = int(meta.partition)
-            local_offset = int(meta.offset)
-            log.info("published event_id=%s topic=%s partition=%s offset=%s", event["id"], topic, partition, local_offset)
-            return partition, local_offset
+            partition, kafka_offset = int(meta.partition), int(meta.offset)
+            log.info("published event_id=%s topic=%s partition=%s offset=%s", event["id"], topic, partition, kafka_offset)
+            return partition, kafka_offset
         except Exception as exc:
-            log.warning("Kafka publish failed, using fallback queue: %s", exc)
-    memory_queue.put((topic, event))
-    return partition, local_offset
-
-
-def fallback_consumer():
-    while True:
-        topic, event = memory_queue.get()
-        log.info("processed fallback event topic=%s event_id=%s type=%s payload=%s", topic, event.get("id"), event.get("type"), json.dumps(event.get("payload", {}), ensure_ascii=False))
-        memory_queue.task_done()
+            last_error = exc
+            log.warning("Kafka publish attempt %s/5 failed: %s", attempt, exc)
+            reset_producer()
+            time.sleep(attempt)
+    raise RuntimeError(f"Kafka publish failed after retries: {last_error}")
 
 
 def kafka_consumer(topic: str):
@@ -140,8 +147,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path.split("?")[0] in ("/health", "/api/events/health"):
+        path = self.path.split("?")[0]
+        if path == "/health":
             self._send_json(200, {"status": True, "service": "events-service"})
+            return
+        if path == "/api/events/health":
+            kafka_ready = get_producer() is not None
+            self._send_json(
+                200 if kafka_ready else 503,
+                {"status": kafka_ready, "service": "events-service", "kafka": kafka_ready},
+            )
             return
         self._send_json(404, {"error": "not found"})
 
@@ -173,7 +188,12 @@ class Handler(BaseHTTPRequestHandler):
             "payload": payload,
         }
         topic = TOPICS[event_type]
-        partition, off = publish(topic, event)
+        try:
+            partition, off = publish(topic, event)
+        except RuntimeError as exc:
+            log.error("event rejected because Kafka is unavailable: %s", exc)
+            self._send_json(503, {"error": "kafka unavailable", "event_id": event["id"]})
+            return
         log.info("accepted event type=%s topic=%s event_id=%s", event_type, topic, event["id"])
         self._send_json(201, {"status": "success", "partition": partition, "offset": off, "event": event})
 
@@ -192,7 +212,6 @@ def wait_dns(host: str, timeout_sec: int = 30):
 
 
 if __name__ == "__main__":
-    threading.Thread(target=fallback_consumer, daemon=True).start()
     broker_host = BROKERS.split(",")[0].split(":")[0]
     threading.Thread(target=wait_dns, args=(broker_host,), daemon=True).start()
     for topic in TOPICS.values():

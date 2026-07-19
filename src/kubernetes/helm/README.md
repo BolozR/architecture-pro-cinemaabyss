@@ -192,4 +192,20 @@ The chart mounts a Persistent Volume for PostgreSQL, Kafka, and Zookeeper. The v
 
 ## Image Pull Secrets
 
-The chart includes a secret for pulling images from private registries. The secret is created using the value provided in `imagePullSecrets.dockerconfigjson`.
+The default configuration expects the GHCR images to be public and does not
+store registry credentials in the chart. For private images, create a pull
+secret outside Helm and pass its name:
+
+```bash
+kubectl create secret docker-registry ghcr-pull-secret \
+  --namespace cinemaabyss \
+  --docker-server=ghcr.io \
+  --docker-username=USERNAME \
+  --docker-password=TOKEN
+
+helm upgrade --install cinemaabyss ./src/kubernetes/helm \
+  --namespace cinemaabyss --create-namespace \
+  --set imagePullSecrets.existingSecret=ghcr-pull-secret
+```
+
+Never commit a PAT or a base64-encoded Docker configuration to the repository.

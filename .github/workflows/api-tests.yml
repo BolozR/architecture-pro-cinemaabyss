@@ -1,8 +1,10 @@
 name: API Tests
 
 on:
+  push:
+    branches: [ cinema ]
   pull_request:
-    branches: [ main, cinema ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -20,10 +22,14 @@ jobs:
       - name: Build and start services
         run: docker compose up --build -d
 
-      - name: Wait for API Gateway
+      - name: Wait for all APIs
         run: |
-          for i in {1..60}; do
-            if curl -fsS http://localhost:8000/health; then exit 0; fi
+          for i in {1..90}; do
+            if curl -fsS http://localhost:8000/health \
+              && curl -fsS http://localhost:8081/api/movies/health \
+              && curl -fsS http://localhost:8082/api/events/health; then
+              exit 0
+            fi
             sleep 2
           done
           docker compose logs

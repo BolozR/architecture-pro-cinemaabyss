@@ -3,9 +3,9 @@ global:
   namespace: cinemaabyss
   domain: cinemaabyss.example.com
 
-# Image pull secrets
+# Set to a pre-created registry secret only when using private images.
 imagePullSecrets:
-  dockerconfigjson: ewogICJhdXRocyI6IHsKICAgICJnaGNyLmlvIjogewogICAgICAiYXV0aCI6ICJZbTlzYjNweU9tZHBkR2gxWWw5d1lYUmZNVEZCVGtSYVRreEJNRlZKTVVsVlRrNUVSWGRKYmw5Rk4zcE5iR2xzY0hZeVEwcDZka2hQYVZwSldHRXpjVlZzYjNocFJrOUNkMEZ0YWxSSVprMW9ZVFpaVDBGVVZWbFZVbFpUYVRnNFpFaFVUZz09IgogICAgfQogIH0KfQo=
+  existingSecret: ""
 
 # Database configuration
 database:

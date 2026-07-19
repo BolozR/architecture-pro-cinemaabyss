@@ -23,6 +23,10 @@ spec:
       labels:
         app: proxy-service
     spec:
+      {{- with .Values.imagePullSecrets.existingSecret }}
+      imagePullSecrets:
+        - name: {{ . | quote }}
+      {{- end }}
       containers:
       - name: proxy-service
         image: {{ .Values.proxyService.image.repository }}:{{ .Values.proxyService.image.tag }}

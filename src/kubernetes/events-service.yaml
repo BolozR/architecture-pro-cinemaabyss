@@ -32,8 +32,6 @@ spec:
       labels:
         app: events-service
     spec:
-      imagePullSecrets:
-        - name: dockerconfigjson
       containers:
         - name: events-service
           image: ghcr.io/bolozr/architecture-pro-cinemaabyss/events-service:latest
@@ -56,7 +54,7 @@ spec:
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /api/events/health
+              path: /health
               port: 8082
             initialDelaySeconds: 15
             periodSeconds: 15
