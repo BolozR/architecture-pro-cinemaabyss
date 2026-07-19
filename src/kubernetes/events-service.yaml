@@ -32,6 +32,8 @@ spec:
       labels:
         app: events-service
     spec:
+      imagePullSecrets:
+        - name: dockerconfigjson
       containers:
         - name: events-service
           image: ghcr.io/bolozr/architecture-pro-cinemaabyss/events-service:latest
