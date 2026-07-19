@@ -9,7 +9,7 @@ on:
       - 'docker-compose.yml'
       - '.github/workflows/docker-build-push.yml'
   pull_request:
-    branches: [ main ]
+    branches: [ main, cinema ]
   release:
     types: [published]
   workflow_dispatch:
