@@ -1,9 +1,18 @@
-const newman = require('newman');
-const fs = require('fs');
-const path = require('path');
-const yargs = require('yargs/yargs');
-const { hideBin } = require('yargs/helpers');
+// const newman = require('newman');
+// const fs = require('fs');
+// const path = require('path');
+// const yargs = require('yargs/yargs');
+// const { hideBin } = require('yargs/helpers');
+import newman from 'newman';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
+const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Parse command line arguments
 const argv = yargs(hideBin(process.argv))
   .option('environment', {
@@ -77,7 +86,6 @@ const newmanOptions = {
   reporter: {
     htmlextra: {
       export: path.join(reportsDir, `report-${argv.environment}-${new Date().toISOString().replace(/:/g, '-')}.html`),
-      template: 'default',
       showOnlyFails: false,
       noSyntaxHighlighting: false,
       testPaging: true,

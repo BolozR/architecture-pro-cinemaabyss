@@ -1,0 +1,44 @@
+@startuml CinemaAbyss_ToBe
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+title Кинобездна — To-Be C4 Container
+
+Person(user, "Users", "Mobile / Web / Smart TV")
+System_Ext(rec, "RecSys", "External service")
+System_Ext(paymentProvider, "Payment service", "External payment provider")
+
+System_Boundary(k8s, "Kubernetes cluster") {
+  Container(ingress, "Ingress", "Nginx Ingress", "For external HTTPS")
+  Container(proxy, "proxy-service", "Python", "API Gateway")
+
+  Container(monolith, "monolith", "Go", "Old monolith: users, payments, subscribes, discounts")
+  Container(movies, "movies-service", "Go", "Movie metadata")
+  Container(events, "events-service", "Python", "MVP for events")
+
+  ContainerQueue(kafka, "Kafka", "Kafka", "Topics user/movie/payment events")
+
+  ContainerDb(mainDb, "main-db", "PostgreSQL", "DB monolith")
+  ContainerDb(moviesDb, "movies-db", "PostgreSQL", "Movies data")
+}
+
+Rel(user, ingress, "REST API", "HTTPS")
+Rel(ingress, proxy, "Передаёт API-запросы", "HTTP")
+Rel(proxy, monolith, "Legacy API", "HTTP")
+Rel(proxy, movies, "/api/movies по feature flag", "HTTP")
+Rel(proxy, events, "/api/events/*", "HTTP")
+
+Rel(monolith, mainDb, "Read/write", "SQL")
+Rel(movies, moviesDb, "Read/write", "SQL")
+Rel(monolith, paymentProvider, "Payments", "HTTPS")
+Rel(monolith, rec, "Request recs", "HTTPS")
+Rel(events, kafka, "Read/write events", "Kafka")
+
+note right of proxy
+Strangler Fig:
+first, the /api/movies goes to monolith,
+then the percentage of traffic is gradually
+transferred to the movies-service.
+end note
+@enduml
